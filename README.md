@@ -1,6 +1,6 @@
 # Single Motor Gripper
 ### www.garylvov.com
-      This package is designed to implement a ROS wrapper for a gripper actuated by a single dynamixel motor.
+      This package is designed to implement a ROS wrapper for a gripper actuated by a single dynamixel.
 
       It is currently configured for a copycat of the gripper included with Hello Robot's Stretch 
           See: www.garylvov.com/universal-gripper for more information about the universal gripper 
