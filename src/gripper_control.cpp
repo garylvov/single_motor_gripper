@@ -26,10 +26,6 @@ class Gripper
         uint32_t close_pos = 340; // approx. 201 degrees
         uint32_t open_pos = 687; // approx. 104 degrees
 
-        // determines the motor orientation in the gripper to be able to perform a partial close 
-        // see func partial_gripper : motor_orientation is either 1 or -1
-        int motor_orientation = ((int)close_pos - (int)open_pos) / abs(((int)close_pos - (int)open_pos));
-
         ros::ServiceClient motor_client;
 
         ros::ServiceServer close_service;
@@ -68,7 +64,7 @@ class Gripper
                by a full close. The state is changed to be closed so that the toggle function still works
                within this context - toggling from a partial close opens the gripper. */
             double percentage_close = req.value / 255;
-            uint32_t close_value = (percentage_close * (open_pos - close_pos) * motor_orientation) + open_pos;
+            uint32_t close_value = (percentage_close * (close_pos - open_pos)) + open_pos;
             state = true; 
             return (this->send_motor_request(close_value));
         }
