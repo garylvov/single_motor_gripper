@@ -59,12 +59,12 @@ class Gripper
         }
 
         bool partial_gripper(single_motor_gripper::partial::Request &req,
-                        single_motor_gripper::partial::Response &res){
+                             single_motor_gripper::partial::Response &res){
             /* This is meant for partial closing upon fragile objects that would be damaged 
                by a full close. The state is changed to be closed so that the toggle function still works
                within this context - toggling from a partial close opens the gripper. */
-            double percentage_close = req.value / 255;
-            uint32_t close_value = (percentage_close * (close_pos - open_pos)) + open_pos;
+            double percentage_close = (double) req.value / (double) 255;
+            uint32_t close_value = (int) (percentage_close * ((int)close_pos - (int)open_pos)) + (int)open_pos;
             state = true; 
             return (this->send_motor_request(close_value));
         }
