@@ -36,24 +36,24 @@ class Gripper
         // service callback functions 
         bool close_gripper(single_motor_gripper::close::Request &req,
                         single_motor_gripper::close::Response &res){
-            state = true;
+            this->state = true;
             return (this->send_motor_request(close_pos));
         }
 
         bool open_gripper(single_motor_gripper::open::Request &req,
                         single_motor_gripper::open::Response &res){
-            state = false;
+            this->state = false;
             return (this->send_motor_request(open_pos));
         }
 
         bool toggle_gripper(single_motor_gripper::toggle::Request &req,
                             single_motor_gripper::toggle::Response &res){
-            if (state){ // state is true, so gripper is closed, to toggle open gripper
-                state = false;
+            if (this->state){ // state is true, so gripper is closed, to toggle open gripper
+                this->state = false;
                 return (this->send_motor_request(open_pos));
             }
             else{ // state is false, so gripper is closed, to toggle close gripper
-                state = true;
+                this->state = true;
                 return (this->send_motor_request(close_pos));
             }
         }
@@ -65,7 +65,7 @@ class Gripper
                within this context - toggling from a partial close opens the gripper. */
             double percentage_close = (double) req.value / (double) 255;
             uint32_t close_value = (int) (percentage_close * ((int)close_pos - (int)open_pos)) + (int)open_pos;
-            state = true; 
+            this->state = true; 
             return (this->send_motor_request(close_value));
         }
 
