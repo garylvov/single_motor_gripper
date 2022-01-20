@@ -1,103 +1,78 @@
 #include "ros/ros.h"
-#include "single_motor_gripper/close.h"
-#include "single_motor_gripper/open.h"
-#include "single_motor_gripper/toggle.h"
-#include "single_motor_gripper/partial.h"
-#include "dynamixel_workbench_msgs/DynamixelCommand.h"
+#include "interbotix_xs_msgs/JointSingleCommand.h"
+#include "spraygun_trigger/squeeze.h"
+#include "spraygun_trigger/unsqueeze.h"
+// #include "spraygun_trigger/timed_squeeze.h"
+#include "spraygun_trigger/partial_squeeze.h"
 
-class Gripper
+class TriggerControl
 {
     public:
-        Gripper(ros::NodeHandle *nh)
-            {
-                motor_client = nh->serviceClient<dynamixel_workbench_msgs::DynamixelCommand>
-                ("/dynamixel_workbench/dynamixel_command");
-                close_service = nh->advertiseService("gripper/close", &Gripper::close_gripper, this);
-                open_service = nh->advertiseService("gripper/open", &Gripper::open_gripper, this);
-                toggle_service = nh->advertiseService("gripper/toggle", &Gripper::toggle_gripper, this);
-                partial_service = nh->advertiseService("/gripper/partial", &Gripper::partial_gripper, this);
+        TriggerControl(ros::NodeHandle *nh)
+            {   
+                joint_single_cmd_pub= nh->advertise<interbotix_xs_msgs::JointSingleCommand>("/vx300/commands/joint_single", 10);
+                squeeze_service = nh->advertiseService("gripper/squeeze", &TriggerControl::squeeze, this);
+                unsqueeze_service = nh->advertiseService("gripper/unsqueeze", &TriggerControl::unsqueeze, this);
+                // timed_squeeze_service = nh->advertiseService("gripper/timed_squeeze", &TriggerControl::timed_squeeze, this);
+                partial_squeeze_service = nh->advertiseService("/gripper/partial_squeeze", &TriggerControl::partial_squeeze, this);
             }
     
     private:
-        bool state; // State is true if closed, false if open
+        // motor position values for approximately unsqueeze/squeezed orientation
+        // determined experimentally from viewing motor position at squeeze/unsqueeze in Dynamixel Wizard
+        uint32_t squeeze_pos = 340; // TODO: adjust based on physical robot constrains
+        uint32_t unsqueeze_pos = 687;  // TODO: adjust based on physical robot constrains
+        interbotix_xs_msgs::JointSingleCommand jsc;
 
-        // motor position values for approximately open/closed orientation
-        // determined experimentally from viewing motor position at close/open in Dynamixel Wizard
-        uint32_t close_pos = 340; // approx. 201 degrees
-        uint32_t open_pos = 687; // approx. 104 degrees
+        ros::Publisher joint_single_cmd_pub;
 
-        ros::ServiceClient motor_client;
-
-        ros::ServiceServer close_service;
-        ros::ServiceServer open_service; 
-        ros::ServiceServer toggle_service; 
-        ros::ServiceServer partial_service; 
+        ros::ServiceServer squeeze_service;
+        ros::ServiceServer unsqueeze_service; 
+        // ros::ServiceServer timed_squeeze_service; 
+        ros::ServiceServer partial_squeeze_service; 
         
         // service callback functions 
-        bool close_gripper(single_motor_gripper::close::Request &req,
-                        single_motor_gripper::close::Response &res){
-            this->state = true;
-            return (this->send_motor_request(close_pos));
+        bool squeeze(spraygun_trigger::squeeze::Request &req,
+                        spraygun_trigger::squeeze::Response &res){
+            return (this->publish_trigger_cmd(squeeze_pos));
         }
 
-        bool open_gripper(single_motor_gripper::open::Request &req,
-                        single_motor_gripper::open::Response &res){
-            this->state = false;
-            return (this->send_motor_request(open_pos));
+        bool unsqueeze(spraygun_trigger::unsqueeze::Request &req,
+                        spraygun_trigger::unsqueeze::Response &res){
+            return (this->publish_trigger_cmd(unsqueeze_pos));
         }
-
-        bool toggle_gripper(single_motor_gripper::toggle::Request &req,
-                            single_motor_gripper::toggle::Response &res){
-            if (this->state){ // state is true, so gripper is closed, to toggle open gripper
-                this->state = false;
-                return (this->send_motor_request(open_pos));
-            }
-            else{ // state is false, so gripper is closed, to toggle close gripper
-                this->state = true;
-                return (this->send_motor_request(close_pos));
-            }
-        }
-
-        bool partial_gripper(single_motor_gripper::partial::Request &req,
-                             single_motor_gripper::partial::Response &res){
-            /* This is meant for partial closing upon fragile objects that would be damaged 
-               by a full close. The state is changed to be closed so that the toggle function still works
-               within this context - toggling from a partial close opens the gripper. */
-            double percentage_close = (double) req.value / (double) 255;
-            uint32_t close_value = (int) (percentage_close * ((int)close_pos - (int)open_pos)) + (int)open_pos;
-            this->state = true; 
-            return (this->send_motor_request(close_value));
-        }
-
-        // client function : communicates with the dynamixel workbench to control the motor
-        bool send_motor_request(uint32_t value, std::string command="", uint8_t id=1, 
-                                        std::string addr_name="Goal_Position"){
+	/*
+        bool timed_squeeze(spraygun_trigger::timed_squeeze::Request &req,
+                            spraygun_trigger::timed_squeeze::Response &res){
             
-            ROS_INFO("Calling Motor Server...");
-            this->motor_client.waitForExistence();
-            dynamixel_workbench_msgs::DynamixelCommand motor_srv_req;
-            motor_srv_req.request.value = value;
-            motor_srv_req.request.command = command;
-            motor_srv_req.request.id = id;
-            motor_srv_req.request.addr_name = addr_name;
+            // implement non-blocking timer
+            //this->partial_squeeze(req.value);
+            std::cout <<"TODO: implement"<<std::endl;
+        }*/
 
-            if(this->motor_client.call(motor_srv_req))
-            {
-                ROS_INFO("Motor Service Call Succesful");
-                return true;
-            }
-            else{
-                ROS_ERROR("Failed to Call Dynamixel Workbench Motor Service");
-                return false;
-            }
+        bool partial_squeeze(spraygun_trigger::partial_squeeze::Request &req,
+                             spraygun_trigger::partial_squeeze::Response &res){
+            double percentage_squeeze = (double) req.value / (double) 255;
+            int squeeze_value = (int) (percentage_squeeze * ((int)squeeze_pos - (int)unsqueeze_pos)) + (int)unsqueeze_pos;
+            return (this->publish_trigger_cmd(squeeze_value));
+        }
+
+        // publish desired end-effector motor position
+        bool publish_trigger_cmd(int value){
+            jsc.name = "gripper";
+            jsc.cmd = value;
+            
+            joint_single_cmd_pub.publish(jsc);
+            //TODO: Implement check to see if motor command executed succesfully
+            return true;
         }
 };
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "gripper_control");
+    ros::init(argc, argv, "trigger_control");
     ros::NodeHandle nh;
-    Gripper g = Gripper(&nh);
+    TriggerControl tc = TriggerControl(&nh);
     ros::spin();
     return 0;
 }
